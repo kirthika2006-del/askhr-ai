@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AskHR AI — HR Policy Assistant</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="bg-glow"></div>
+
+<div class="app-shell">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-icon">◆</div>
+      <span class="brand-name">AskHR&nbsp;AI</span>
+    </div>
+
+    <section class="glass-card status-card">
+      <h3 class="card-title">System Status</h3>
+      <div class="status-row">
+        <span class="dot" id="dot-qdrant"></span>
+        <span>Qdrant</span>
+        <span class="status-value" id="status-qdrant">Checking…</span>
+      </div>
+      <div class="status-row">
+        <span class="dot" id="dot-gemini"></span>
+        <span>Gemini</span>
+        <span class="status-value" id="status-gemini">Checking…</span>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-box">
+          <span class="stat-num" id="stat-docs">0</span>
+          <span class="stat-label">Documents</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-num" id="stat-chunks">0</span>
+          <span class="stat-label">Chunks</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="glass-card upload-card">
+      <h3 class="card-title">HR Documents</h3>
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="file-input" accept=".pdf,.docx,.txt" hidden />
+        <div class="dropzone-icon">⬆</div>
+        <p class="dropzone-text">Drag & drop a policy document</p>
+        <p class="dropzone-sub">Employee handbook, leave policy, onboarding guide · PDF, DOCX, TXT</p>
+      </div>
+      <div id="upload-progress-area"></div>
+    </section>
+
+    <section class="glass-card doc-list-card">
+      <h3 class="card-title">Documents</h3>
+      <div id="doc-list" class="doc-list">
+        <p class="empty-hint">No documents yet. Upload one to get started.</p>
+      </div>
+    </section>
+  </aside>
+
+  <!-- ============ MAIN CHAT ============ -->
+  <main class="main-panel">
+    <header class="chat-header">
+      <button class="icon-btn mobile-only" id="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
+      <div>
+        <h1>AI Assistant</h1>
+        <p class="subtitle">Ask questions grounded in your company's HR policies</p>
+      </div>
+      <button class="icon-btn" id="clear-chat-btn" title="Clear conversation">🗑</button>
+    </header>
+
+    <div class="chat-scroll" id="chat-scroll">
+      <div class="chat-empty" id="chat-empty">
+        <div class="chat-empty-icon">✦</div>
+        <h2>Ask anything about your HR policies</h2>
+        <p>Upload employee handbooks, leave policies, or onboarding guides on the left, then ask a question grounded in their content.</p>
+      </div>
+      <div id="messages"></div>
+    </div>
+
+    <form class="chat-input-bar" id="chat-form">
+      <textarea
+        id="chat-input"
+        placeholder="Ask about leave policy, onboarding, benefits…"
+        rows="1"
+      ></textarea>
+      <button type="submit" class="send-btn" id="send-btn" aria-label="Send">➤</button>
+    </form>
+  </main>
+</div>
+
+<template id="tpl-user-message">
+  <div class="msg msg-user">
+    <div class="msg-bubble"></div>
+    <div class="msg-time"></div>
+  </div>
+</template>
+
+<template id="tpl-assistant-message">
+  <div class="msg msg-assistant">
+    <div class="msg-avatar">◆</div>
+    <div class="msg-body">
+      <div class="msg-bubble"></div>
+      <div class="sources-wrap"></div>
+      <div class="msg-actions">
+        <button class="mini-btn copy-btn" title="Copy">⧉ Copy</button>
+        <button class="mini-btn regen-btn" title="Regenerate">↻ Regenerate</button>
+      </div>
+      <div class="msg-time"></div>
+    </div>
+  </div>
+</template>
+
+<template id="tpl-doc-item">
+  <div class="doc-item">
+    <div class="doc-icon">📄</div>
+    <div class="doc-info">
+      <div class="doc-name"></div>
+      <div class="doc-meta"></div>
+    </div>
+    <button class="doc-delete" title="Delete">✕</button>
+  </div>
+</template>
+
+<template id="tpl-source-card">
+  <div class="source-card">
+    <div class="source-file">📄 <span></span></div>
+    <div class="source-page"></div>
+    <div class="source-relevance"></div>
+  </div>
+</template>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

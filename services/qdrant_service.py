@@ -3,17 +3,17 @@ import logging
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
 from qdrant_client.http.exceptions import UnexpectedResponse
-
+ 
 logger = logging.getLogger(__name__)
-
-
+ 
+ 
 class QdrantServiceError(Exception):
     def __init__(self, message: str, code: str = "QDRANT_ERROR"):
         super().__init__(message)
         self.message = message
         self.code = code
-
-
+ 
+ 
 class QdrantService:
     def __init__(self, url: str, api_key: str, collection_name: str, vector_size: int):
         if not url:
@@ -29,7 +29,7 @@ class QdrantService:
                 "CONNECTION_FAILED",
             )
         self._ensure_collection()
-
+ 
     def _ensure_collection(self):
         try:
             existing = [c.name for c in self.client.get_collections().collections]
@@ -39,7 +39,7 @@ class QdrantService:
                 "Could not reach the Qdrant cluster. Check network/credentials.",
                 "CONNECTION_FAILED",
             )
-
+ 
         if self.collection_name not in existing:
             try:
                 self.client.create_collection(
@@ -55,7 +55,7 @@ class QdrantService:
                 raise QdrantServiceError(
                     f"Failed to create collection: {exc}", "COLLECTION_CREATE_FAILED"
                 )
-
+ 
     def health_check(self) -> bool:
         try:
             self.client.get_collections()
@@ -63,7 +63,7 @@ class QdrantService:
         except Exception as exc:
             logger.warning("Qdrant health check failed: %s", exc)
             return False
-
+ 
     def collection_stats(self):
         try:
             info = self.client.get_collection(self.collection_name)
@@ -71,7 +71,7 @@ class QdrantService:
         except Exception as exc:
             logger.warning("Could not fetch collection stats: %s", exc)
             return {"points_count": 0}
-
+ 
     def upsert_chunks(self, points):
         """points: list of qmodels.PointStruct"""
         try:
@@ -79,7 +79,7 @@ class QdrantService:
         except Exception as exc:
             logger.error("Qdrant upsert failed: %s", exc)
             raise QdrantServiceError(f"Failed to store vectors: {exc}", "UPSERT_FAILED")
-
+ 
     def search(self, query_vector, top_k: int, similarity_threshold: float):
         try:
             results = self.client.query_points(
@@ -93,7 +93,7 @@ class QdrantService:
         except Exception as exc:
             logger.error("Qdrant search failed: %s", exc)
             raise QdrantServiceError(f"Search failed: {exc}", "SEARCH_FAILED")
-
+ 
     def delete_document(self, document_id: str):
         try:
             self.client.delete(
@@ -114,7 +114,48 @@ class QdrantService:
             raise QdrantServiceError(
                 f"Failed to delete document vectors: {exc}", "DELETE_FAILED"
             )
-
+ 
+    def list_document_summaries(self):
+        """Reconstruct a document list by scanning stored chunk payloads.
+ 
+        Used to recover the document list if the local registry file was
+        lost (e.g. after a redeploy on a host with an ephemeral disk, like
+        Render's free tier) -- the vectors in Qdrant are the source of
+        truth and always survive a restart.
+        """
+        summaries = {}
+        next_offset = None
+        try:
+            while True:
+                points, next_offset = self.client.scroll(
+                    collection_name=self.collection_name,
+                    with_payload=True,
+                    with_vectors=False,
+                    limit=256,
+                    offset=next_offset,
+                )
+                for point in points:
+                    payload = point.payload or {}
+                    doc_id = payload.get("document_id")
+                    if not doc_id:
+                        continue
+                    if doc_id not in summaries:
+                        summaries[doc_id] = {
+                            "id": doc_id,
+                            "filename": payload.get("filename", "unknown"),
+                            "extension": None,
+                            "size_bytes": None,
+                            "uploaded_at": None,
+                            "chunk_count": 0,
+                            "status": "completed",
+                        }
+                    summaries[doc_id]["chunk_count"] += 1
+                if next_offset is None:
+                    break
+        except Exception as exc:
+            logger.warning("Could not rebuild document list from Qdrant: %s", exc)
+        return summaries
+ 
     def count_chunks(self, document_id: str) -> int:
         try:
             result = self.client.count(
@@ -132,3 +173,4 @@ class QdrantService:
         except Exception as exc:
             logger.warning("Could not count chunks for doc %s: %s", document_id, exc)
             return 0
+ 
